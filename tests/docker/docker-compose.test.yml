@@ -1,0 +1,68 @@
+networks:
+  adapter-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+
+services:
+
+  tester:
+    build:
+      context: ${MODULE_ROOT_FLD:-}
+      dockerfile_inline: |
+        FROM python:3.12-slim
+        
+        RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+        ENV VIRTUAL_ENV=/opt/venv
+        RUN python -m venv $$VIRTUAL_ENV
+        ENV PATH="$$VIRTUAL_ENV/bin:$$PATH"
+
+        WORKDIR /app/module
+
+        COPY setup.py .
+        RUN mkdir -p LedgerAdapter && touch LedgerAdapter/__init__.py
+
+        RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+          && pip install --no-cache-dir . \
+          && rm -rf LedgerAdapter setup.py
+    image: python/adapter-tester
+    environment:
+      - MODULE_ROOT_FLD=${MODULE_ROOT_FLD-}
+      - NODE_URL=${NODE_URL:-}
+      - GENESIS_CONTRACTS_PATH=${GENESIS_CONTRACTS_PATH:-}
+    volumes:
+      - ${MODULE_ROOT_FLD:-/tmp}:/app/module
+      - ${GENESIS_CONTRACTS_PATH:-/dev/null}:/app/genesis-contracts.json:ro
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        pip install -e /app/module --no-deps
+        pytest -v -s /app/module/tests/
+    networks:
+      - adapter-net
+
+  rescale-onlykey:
+    image: ${RESCALE_NODE_IMAGE:-}
+    environment:
+      - P2P_DISCOVERY=${BESU_NODE_IP:-}
+    volumes:
+      # - ${DATA_DIR:-}:/app/node/data
+      - /dev/null:/app/node/auth.toml
+      - /tmp:/app/node/cert
+    networks:
+      adapter-net:
+        ipv4_address: ${BESU_NODE_IP:-}
+
+
+  # rescale-testnode:
+  #   image: ${RESCALE_NODE_IMAGE:-}
+  #   environment:
+  #     - P2P_DISCOVERY=${P2P_DISCOVERY:-}
+  #   # volumes:
+  #   #   - ${P12_FILE:-/dev/null}:/app/cert.p12
+  #   #   - ${P12_PASS_FILE:-/dev/null}:/app/pass.txt
+  #   networks:
+  #     adapter-net:
+  #       ipv4_address: 172.29.0.2

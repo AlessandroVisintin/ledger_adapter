@@ -1,0 +1,72 @@
+import json
+import os
+import pytest
+
+from dotenv import load_dotenv
+
+from LedgerAdapter.connection import Connection
+from LedgerAdapter.hash_manager import HashManager
+from LedgerAdapter.utils import wait_for_liveness
+
+
+load_dotenv(dotenv_path='/app/.env')
+
+
+### Keys
+@pytest.fixture
+def private_key_alice():
+    return "0x3f9d4328d47d5aa8b84c4716679a78fc21eab62be253b99315e4fa924d07559f"
+
+
+@pytest.fixture
+def public_key_alice():
+    return "0xe4a2e908bf0e1ca4305c1fe6c5f84eba66a98863049a841689b3e2f7e280b110a60ba73122e8051ea61a150c3c7e72b07dcb965f2867981a772e9fb0fc1bd5ee"
+
+
+@pytest.fixture
+def private_key_bob():
+    return "0x26e4865f9787ec01bf0f586ac704bd7395262279a119cbadcf14e6336ec8c8a0"
+
+
+@pytest.fixture
+def public_key_bob():
+    return "0x36ce7c84bd0015ea1073cd5f7843466156728fa84292e2f48d7ca6e445f46a9b5eaf12aebfef8ebb8913c05d4edd8ea57b26a784ddee42a51646a5cf1e0e2d67"
+
+
+## Nodes
+@pytest.fixture
+def node_url():
+    return os.getenv("NODE_URL")
+
+
+@pytest.fixture
+def node_connection(node_url):
+    connection = Connection(node_url=node_url)
+    wait_for_liveness(connection.get_provider())
+    return connection
+
+
+### Contracts
+@pytest.fixture
+def genesis_contracts():
+    with open('/app/genesis-contracts.json', 'r') as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def hash_manager_address(genesis_contracts):
+    return genesis_contracts["HashManager"]["address"]
+
+
+@pytest.fixture
+def hash_manager_abi(genesis_contracts):
+    return genesis_contracts["HashManager"]["abi"]
+
+
+@pytest.fixture
+def hash_manager(node_connection, hash_manager_address, hash_manager_abi):
+    return HashManager(
+        node_connection=node_connection,
+        contract_address=hash_manager_address,
+        contract_abi=hash_manager_abi
+    )
