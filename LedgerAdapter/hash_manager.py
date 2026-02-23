@@ -27,12 +27,16 @@ class HashManager(Contract):
         contract_function = self.contract.functions.add(hashed_value)
         return self.execute(contract_function, private_key, synchronous)
 
-    def read(self, hashed_value: str) -> BlockchainValue | BlockchainError:
+    def read(self,
+             hashed_value: str) -> BlockchainValue | BlockchainError:
         hashed_value_bytes = Web3.to_bytes(hexstr=hashed_value)
         contract_function = self.contract.functions.read(hashed_value_bytes)
         return self.call(contract_function)
     
-    def deprecate(self, hashed_value: str, private_key: str) -> BlockchainResponse | BlockchainError:
+    def deprecate(self,
+                  hashed_value: str,
+                  private_key: str,
+                  synchronous: bool = False) -> BlockchainResponse | BlockchainError:
         hashed_value_bytes = Web3.to_bytes(hexstr=hashed_value)
         contract_function = self.contract.functions.deprecate(hashed_value_bytes)
-        return self.execute(contract_function, private_key)
+        return self.execute(contract_function, private_key, synchronous)

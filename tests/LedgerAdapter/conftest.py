@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from LedgerAdapter.connection import Connection
 from LedgerAdapter.hash_manager import HashManager
+from LedgerAdapter.dag_hash_manager import DagHashManager
 from LedgerAdapter.utils import wait_for_liveness
 
 
@@ -33,6 +34,11 @@ def public_key_bob():
     return "0x36ce7c84bd0015ea1073cd5f7843466156728fa84292e2f48d7ca6e445f46a9b5eaf12aebfef8ebb8913c05d4edd8ea57b26a784ddee42a51646a5cf1e0e2d67"
 
 
+@pytest.fixture
+def test_address():
+    return "0xe4a2E908bf0E1ca4305C1fE6C5F84EBA66a98863"
+
+
 ## Nodes
 @pytest.fixture
 def node_url():
@@ -45,6 +51,37 @@ def node_connection(node_url):
     wait_for_liveness(connection.get_provider())
     return connection
 
+
+@pytest.fixture
+def root_connection(node_url):
+    connection = Connection(node_url=node_url)
+    connection.with_authentication(
+        username=os.getenv("USERNAME_ROOT"),
+        password=os.getenv("PASSWORD_ROOT")
+        )
+    wait_for_liveness(connection.get_provider())
+    return connection
+
+
+@pytest.fixture
+def eth_connection(node_url):
+    connection = Connection(node_url=node_url)
+    connection.with_authentication(
+        username=os.getenv("USERNAME_ETH"),
+        password=os.getenv("PASSWORD_ETH")
+        )
+    wait_for_liveness(connection.get_provider())
+    return connection
+
+@pytest.fixture
+def public_connection(node_url):
+    connection = Connection(node_url=node_url)
+    connection.with_authentication(
+        username=os.getenv("USERNAME_PUBLIC"),
+        password=os.getenv("PASSWORD_PUBLIC")
+        )
+    wait_for_liveness(connection.get_provider())
+    return connection
 
 ### Contracts
 @pytest.fixture
@@ -69,4 +106,48 @@ def hash_manager(node_connection, hash_manager_address, hash_manager_abi):
         node_connection=node_connection,
         contract_address=hash_manager_address,
         contract_abi=hash_manager_abi
+    )
+
+
+@pytest.fixture
+def root_hash_manager(root_connection, hash_manager_address, hash_manager_abi):
+    return HashManager(
+        node_connection=root_connection,
+        contract_address=hash_manager_address,
+        contract_abi=hash_manager_abi
+    )
+
+@pytest.fixture
+def eth_hash_manager(eth_connection, hash_manager_address, hash_manager_abi):
+    return HashManager(
+        node_connection=eth_connection,
+        contract_address=hash_manager_address,
+        contract_abi=hash_manager_abi
+    )
+
+@pytest.fixture
+def public_hash_manager(public_connection, hash_manager_address, hash_manager_abi):
+    return HashManager(
+        node_connection=public_connection,
+        contract_address=hash_manager_address,
+        contract_abi=hash_manager_abi
+    )
+
+
+@pytest.fixture
+def dag_hash_manager_address(genesis_contracts):
+    return genesis_contracts["DagHashManager"]["address"]
+
+
+@pytest.fixture
+def dag_hash_manager_abi(genesis_contracts):
+    return genesis_contracts["DagHashManager"]["abi"]
+
+
+@pytest.fixture
+def dag_hash_manager(node_connection, dag_hash_manager_address, dag_hash_manager_abi):
+    return DagHashManager(
+        node_connection=node_connection,
+        contract_address=dag_hash_manager_address,
+        contract_abi=dag_hash_manager_abi
     )

@@ -31,9 +31,12 @@ class BlockchainResponse:
     events: list[EventDetails]
 
 @dataclass
-class BlockchainError:
+class BlockchainError(Exception):
     message: str
     status: int=0
+
+    def __str__(self):
+        return self.message
 
 @dataclass
 class EventData:

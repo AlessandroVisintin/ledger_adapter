@@ -4,7 +4,7 @@ from hexbytes import HexBytes
 from typing import List, Dict, Union
 from web3 import Web3
 from web3.contract.contract import ContractFunction
-from web3.exceptions import Web3RPCError
+from web3.exceptions import Web3RPCError, ContractLogicError
 from web3.middleware import ExtraDataToPOAMiddleware
 from web3.providers import HTTPProvider
 from web3.types import TxReceipt
@@ -39,7 +39,8 @@ class Contract(ABC):
             abi=contract_abi
         )
     
-    def wait_for_receipt(self, tx_hash):
+    def wait_for_receipt(self,
+                         tx_hash: str):
         try:
             return self._parse_receipt(
                 self.w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -47,7 +48,8 @@ class Contract(ABC):
         except Web3RPCError as e:
             return parse_error(e)
 
-    def _parse_receipt(self, receipt: TxReceipt) -> BlockchainResponse:        
+    def _parse_receipt(self,
+                       receipt: TxReceipt) -> BlockchainResponse:        
         return BlockchainResponse(
             status=str(receipt.status),
             block=BlockDetails(
@@ -63,7 +65,8 @@ class Contract(ABC):
             events=self._parse_events(receipt)
         )
 
-    def _parse_events(self, receipt: TxReceipt) -> List[EventDetails]:
+    def _parse_events(self,
+                      receipt: TxReceipt) -> List[EventDetails]:
         parsed_events = []
         for event_abi in [abi for abi in self.contract.abi if abi['type'] == 'event']:
             event_name = event_abi['name']
@@ -77,11 +80,12 @@ class Contract(ABC):
                 parsed_events.append(event_data)
         return parsed_events
 
-    def call(contract_function: ContractFunction) -> BlockchainValue | BlockchainError:
+    def call(self,
+             contract_function: ContractFunction) -> BlockchainValue | BlockchainError:
         try:
             return BlockchainValue(value=contract_function.call())
         except Exception as e:
-            return BlockchainError(message=str(e))
+            raise parse_error(e)
 
     def execute(self, 
                 contract_function: ContractFunction,
@@ -108,8 +112,8 @@ class Contract(ABC):
                 return receipt
             
             return to_0xhex(tx_hash)
-        except Web3RPCError as e:
-            return parse_error(e)
+        except (Web3RPCError,ContractLogicError) as e:
+            raise parse_error(e)
 
 # #     def retrieve_events(
 # #         self,

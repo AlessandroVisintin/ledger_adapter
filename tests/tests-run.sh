@@ -17,6 +17,21 @@ fi
 export NODE_URL="http://$BESU_NODE_IP:$BESU_NODE_PORT"
 export P2P_DISCOVERY="$BESU_NODE_IP"
 
-docker compose -f "$COMPOSE_TEST_FILE" up -d rescale-onlykey
-docker compose -f "$COMPOSE_TEST_FILE" run --rm tester
-docker compose -f "$COMPOSE_TEST_FILE" down
+#
+# docker compose -f "$COMPOSE_TEST_FILE" up -d rescale-onlykey
+
+# export TEST_FILE="test_hash_manager.py"
+# docker compose -f "$COMPOSE_TEST_FILE" run --rm tester
+
+# export TEST_FILE="test_dag_hash_manager.py"
+# docker compose -f "$COMPOSE_TEST_FILE" run --rm tester
+
+# docker compose -f "$COMPOSE_TEST_FILE" down
+
+#
+# docker compose -f "$COMPOSE_TEST_FILE" up -d rescale-auth
+
+# export TEST_FILE="test_rescalenode_authentication.py"
+# docker compose -f "$COMPOSE_TEST_FILE" run --rm tester
+
+# docker compose -f "$COMPOSE_TEST_FILE" down

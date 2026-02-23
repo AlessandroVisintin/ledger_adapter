@@ -32,6 +32,13 @@ services:
       - MODULE_ROOT_FLD=${MODULE_ROOT_FLD-}
       - NODE_URL=${NODE_URL:-}
       - GENESIS_CONTRACTS_PATH=${GENESIS_CONTRACTS_PATH:-}
+      - TEST_FILE=${TEST_FILE:-}
+      - USERNAME_ROOT=${USERNAME_ROOT:-}
+      - PASSWORD_ROOT=${PASSWORD_ROOT:-}
+      - USERNAME_ETH=${USERNAME_ETH:-}
+      - PASSWORD_ETH=${PASSWORD_ETH:-}
+      - USERNAME_PUBLIC=${USERNAME_PUBLIC:-}
+      - PASSWORD_PUBLIC=${PASSWORD_PUBLIC:-}
     volumes:
       - ${MODULE_ROOT_FLD:-/tmp}:/app/module
       - ${GENESIS_CONTRACTS_PATH:-/dev/null}:/app/genesis-contracts.json:ro
@@ -39,7 +46,7 @@ services:
     command:
       - |
         pip install -e /app/module --no-deps
-        pytest -v -s /app/module/tests/
+        pytest -v -s /app/module/tests/LedgerAdapter/$$TEST_FILE
     networks:
       - adapter-net
 
@@ -48,13 +55,33 @@ services:
     environment:
       - P2P_DISCOVERY=${BESU_NODE_IP:-}
     volumes:
-      # - ${DATA_DIR:-}:/app/node/data
       - /dev/null:/app/node/auth.toml
       - /tmp:/app/node/cert
     networks:
       adapter-net:
         ipv4_address: ${BESU_NODE_IP:-}
 
+  rescale-auth:
+    image: ${RESCALE_NODE_IMAGE:-}
+    environment:
+      - P2P_DISCOVERY=${BESU_NODE_IP:-}
+    volumes:
+      # - /dev/null:/app/node/auth.toml
+      - /tmp:/app/node/cert
+    networks:
+      adapter-net:
+        ipv4_address: ${BESU_NODE_IP:-}
+
+  rescale-tls:
+    image: ${RESCALE_NODE_IMAGE:-}
+    environment:
+      - P2P_DISCOVERY=${BESU_NODE_IP:-}
+    volumes:
+      - /dev/null:/app/node/auth.toml
+      # - /tmp:/app/node/cert
+    networks:
+      adapter-net:
+        ipv4_address: ${BESU_NODE_IP:-}
 
   # rescale-testnode:
   #   image: ${RESCALE_NODE_IMAGE:-}

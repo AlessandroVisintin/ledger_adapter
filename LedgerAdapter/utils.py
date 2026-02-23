@@ -4,9 +4,6 @@ import time
 from hexbytes import HexBytes
 from requests import Session
 from typing import Optional
-from web3.contract import Contract
-from web3.types import TxReceipt
-from web3.exceptions import Web3RPCError
 from web3.providers import HTTPProvider
 
 from .models import (
@@ -24,16 +21,22 @@ def to_0xhex(value):
     return value
 
 
-def parse_error(error: Web3RPCError) -> BlockchainError:
-    if isinstance(error, Web3RPCError):    
-        try:
-            error_details_str = error.args[0]
-            error_dict = ast.literal_eval(error_details_str)
+def parse_error(error: Exception) -> BlockchainError:
+    try:
+        error_details = error.args[0]
+        if isinstance(error_details, str):
+            return BlockchainError(message=error_details, status=0)
+        if isinstance(error_details, tuple) and len(error_details) > 0:
+            return BlockchainError(message=str(error_details[0]), status=0)
+
+        error_dict = ast.literal_eval(str(error_details))
+        if isinstance(error_dict, dict):
             message = error_dict.get('message', str(error))
             return BlockchainError(message=message, status=0)
-        except (ValueError, SyntaxError, IndexError):
-            return BlockchainError(message=str(error), status=0)
-    return BlockchainError(message=str(error), status=0)
+        
+        return BlockchainError(message=str(error_details), status=0)
+    except (ValueError, SyntaxError, IndexError):
+        return BlockchainError(message=str(error), status=0)
 
 
 def wait_for_liveness(provider: HTTPProvider, timeout: int = 30, poll_interval: float = 1.0) -> None:
