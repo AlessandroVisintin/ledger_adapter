@@ -32,6 +32,7 @@ services:
       - MODULE_ROOT_FLD=${MODULE_ROOT_FLD-}
       - NODE_URL=${NODE_URL:-}
       - GENESIS_CONTRACTS_PATH=${GENESIS_CONTRACTS_PATH:-}
+      - CA_CERTIFICATE_PATH=${CA_CERTIFICATE_PATH:-} 
       - TEST_FILE=${TEST_FILE:-}
       - USERNAME_ROOT=${USERNAME_ROOT:-}
       - PASSWORD_ROOT=${PASSWORD_ROOT:-}
@@ -42,6 +43,7 @@ services:
     volumes:
       - ${MODULE_ROOT_FLD:-/tmp}:/app/module
       - ${GENESIS_CONTRACTS_PATH:-/dev/null}:/app/genesis-contracts.json:ro
+      - ${CA_CERTIFICATE_PATH:-/dev/null}:/app/ca-certificate.pem
     entrypoint: ["sh", "-ec"]
     command:
       - |
@@ -82,14 +84,3 @@ services:
     networks:
       adapter-net:
         ipv4_address: ${BESU_NODE_IP:-}
-
-  # rescale-testnode:
-  #   image: ${RESCALE_NODE_IMAGE:-}
-  #   environment:
-  #     - P2P_DISCOVERY=${P2P_DISCOVERY:-}
-  #   # volumes:
-  #   #   - ${P12_FILE:-/dev/null}:/app/cert.p12
-  #   #   - ${P12_PASS_FILE:-/dev/null}:/app/pass.txt
-  #   networks:
-  #     adapter-net:
-  #       ipv4_address: 172.29.0.2

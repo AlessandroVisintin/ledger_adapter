@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-TESTS_FLD=$(CDPATH= cd "$(dirname "$0")" && pwd -P)
-ENV_DOCKER_PATH="$TESTS_FLD/.env.docker"
+ROOT_FLD=$(CDPATH= cd "$(dirname "$0")/.." && pwd -P)
+ENV_DOCKER_PATH="$ROOT_FLD/.env.docker"
 
 if [ -f "$ENV_DOCKER_PATH" ]; then
     printf '%s\n' "Loading configuration from $ENV_DOCKER_PATH"

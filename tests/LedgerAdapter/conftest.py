@@ -3,6 +3,7 @@ import os
 import pytest
 
 from dotenv import load_dotenv
+from pathlib import Path
 
 from LedgerAdapter.connection import Connection
 from LedgerAdapter.hash_manager import HashManager
@@ -42,13 +43,22 @@ def test_address():
 ## Nodes
 @pytest.fixture
 def node_url():
-    return os.getenv("NODE_URL")
+    url = os.getenv("NODE_URL")
+    assert url is not None, "NODE_URL env variable is not set"
+    return url
+
+
+@pytest.fixture
+def ca_cert_path():
+    path = Path("/app/ca-certificate.pem")
+    assert path.exists(), f"CA certificate not found: {path}"
+    return str(path)
 
 
 @pytest.fixture
 def node_connection(node_url):
     connection = Connection(node_url=node_url)
-    wait_for_liveness(connection.get_provider())
+    wait_for_liveness(connection)
     return connection
 
 
@@ -59,7 +69,7 @@ def root_connection(node_url):
         username=os.getenv("USERNAME_ROOT"),
         password=os.getenv("PASSWORD_ROOT")
         )
-    wait_for_liveness(connection.get_provider())
+    wait_for_liveness(connection)
     return connection
 
 
@@ -70,7 +80,7 @@ def eth_connection(node_url):
         username=os.getenv("USERNAME_ETH"),
         password=os.getenv("PASSWORD_ETH")
         )
-    wait_for_liveness(connection.get_provider())
+    wait_for_liveness(connection)
     return connection
 
 @pytest.fixture
@@ -80,7 +90,13 @@ def public_connection(node_url):
         username=os.getenv("USERNAME_PUBLIC"),
         password=os.getenv("PASSWORD_PUBLIC")
         )
-    wait_for_liveness(connection.get_provider())
+    wait_for_liveness(connection)
+    return connection
+
+@pytest.fixture
+def tls_connection(node_url, ca_cert_path):
+    connection = Connection(node_url=node_url).with_tls(ca_cert_path=ca_cert_path)
+    wait_for_liveness(connection)
     return connection
 
 ### Contracts
@@ -104,6 +120,15 @@ def hash_manager_abi(genesis_contracts):
 def hash_manager(node_connection, hash_manager_address, hash_manager_abi):
     return HashManager(
         node_connection=node_connection,
+        contract_address=hash_manager_address,
+        contract_abi=hash_manager_abi
+    )
+
+
+@pytest.fixture
+def tls_hash_manager(tls_connection, hash_manager_address, hash_manager_abi):
+    return HashManager(
+        node_connection=tls_connection,
         contract_address=hash_manager_address,
         contract_abi=hash_manager_abi
     )

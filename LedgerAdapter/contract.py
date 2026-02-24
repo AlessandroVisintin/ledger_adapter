@@ -1,7 +1,7 @@
 from abc import ABC
 from eth_account import Account
 from hexbytes import HexBytes
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional, Any
 from web3 import Web3
 from web3.contract.contract import ContractFunction
 from web3.exceptions import Web3RPCError, ContractLogicError
@@ -14,12 +14,15 @@ from .models import (
     BlockchainValue,
     BlockchainResponse,
     BlockDetails,
+    EventData,
     EventDetails,
-    TransactionDetails
+    TransactionDetails,
 )
 from .utils import (
+    bytes_to_0xhex,
+    hex0x_to_bytes,
     parse_error,
-    to_0xhex
+    parse_event_data,
 )
 
 
@@ -53,11 +56,11 @@ class Contract(ABC):
         return BlockchainResponse(
             status=str(receipt.status),
             block=BlockDetails(
-                block_hash=to_0xhex(receipt.blockHash),
+                block_hash=bytes_to_0xhex(receipt.blockHash),
                 block_number=str(receipt.blockNumber)
             ),
             transaction=TransactionDetails(
-                transaction_hash=to_0xhex(receipt.transactionHash),
+                transaction_hash=bytes_to_0xhex(receipt.transactionHash),
                 from_address=str(receipt['from']),
                 to_address=str(receipt['to']),
                 gas_used=str(receipt.gasUsed)
@@ -75,7 +78,10 @@ class Contract(ABC):
             for log in logs:
                 event_data = EventDetails(
                     event_name=log.event,
-                    event_results=dict(log.args)
+                    event_results={
+                        k: bytes_to_0xhex(v) if isinstance(v, (bytes, HexBytes)) else v
+                        for k, v in dict(log.args).items()
+                    }
                 )
                 parsed_events.append(event_data)
         return parsed_events
@@ -83,7 +89,7 @@ class Contract(ABC):
     def call(self,
              contract_function: ContractFunction) -> BlockchainValue | BlockchainError:
         try:
-            return BlockchainValue(value=contract_function.call())
+            return BlockchainValue(value=bytes_to_0xhex( contract_function.call() ))
         except Exception as e:
             raise parse_error(e)
 
@@ -111,54 +117,58 @@ class Contract(ABC):
                 receipt = self.wait_for_receipt(tx_hash)
                 return receipt
             
-            return to_0xhex(tx_hash)
+            return bytes_to_0xhex(tx_hash)
         except (Web3RPCError,ContractLogicError) as e:
             raise parse_error(e)
 
-# #     def retrieve_events(
-# #         self,
-# #         event_type: str = None,
-# #         from_block: int = 0,
-# #         to_block: str = 'latest',
-# #         block_hash: str = None,
-# #         argument_filters: Dict[str, Any] = None
-# #     ) -> List[EventData] | BlockchainError:
+    def get_events(
+        self,
+        from_block: int = 0,
+        to_block: Union[int, str] = 'latest',
+        event_name: Optional[str] = None,
+        argument_filters: Optional[Dict[str, Any]] = None
+    ) -> List[EventData]:
+
+        if argument_filters is not None and event_name is None:
+            raise BlockchainError(
+                message="argument_filters requires a specific event_name"
+            )
         
-# #         try:
-# #             filter_args = {}
+        try:
+            if event_name is not None:
+                event_names_in_abi = {
+                    entry['name']
+                    for entry in self.contract.abi
+                    if entry['type'] == 'event'
+                }
+                if event_name not in event_names_in_abi:
+                    raise BlockchainError(
+                        message=f"Event '{event_name}' not found in contract ABI"
+                    )
+                event_processor = getattr(self.contract.events, event_name)
+                logs = list(event_processor.get_logs(
+                    argument_filters=hex0x_to_bytes(argument_filters),
+                    from_block=from_block,
+                    to_block=to_block
+                ))
+            else:
+                logs = []
+                for abi_entry in self.contract.abi:
+                    if abi_entry['type'] == 'event':
+                        event_processor = getattr(self.contract.events, abi_entry['name'])
+                        logs.extend(event_processor.get_logs(
+                            from_block=from_block,
+                            to_block=to_block
+                        ))
+                logs.sort(key=lambda log: (
+                    log.blockNumber,
+                    log.transactionIndex,
+                    log.logIndex
+                ))
 
-# #             if block_hash:
-# #                 block = self.w3.eth.get_block(block_hash)
-# #                 filter_args['from_block'] = block['number']
-# #                 filter_args['to_block'] = block['number']
-# #             else:
-# #                 filter_args['from_block'] = from_block
-# #                 filter_args['to_block'] = to_block
-
-# #             log_entries = []
-# #             if event_type:
-# #                 if not hasattr(self.contract.events, event_type):
-# #                     return BlockchainError(message=f"Event type '{event_type}' not found in contract ABI.")
-                
-# #                 event_constructor = getattr(self.contract.events, event_type)
-                
-# #                 if argument_filters:
-# #                     filter_args['argument_filters'] = argument_filters
-                
-# #                 event_filter = event_constructor.create_filter(**filter_args)
-# #                 log_entries = event_filter.get_all_entries()
-# #             else:
-# #                 if argument_filters:
-# #                     return BlockchainError(message="argument_filters cannot be used without a specific event_type.")
-
-# #                 for event_constructor in self.contract.events:
-# #                     event_filter = event_constructor.create_filter(**filter_args)
-# #                     log_entries.extend(event_filter.get_all_entries())
+        except BlockchainError:
+            raise
+        except Web3RPCError as e:
+            raise parse_error(e)  
             
-# #             return [parse_event_data(log) for log in log_entries]
-        
-# #         except Web3RPCError as e:
-# #             return parse_error(e)
-        
-# #         except Exception as e:
-# #             return BlockchainError(message=str(e))
+        return [parse_event_data(log) for log in logs]

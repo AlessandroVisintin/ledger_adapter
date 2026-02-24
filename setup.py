@@ -9,11 +9,12 @@ setup(
         "eth-abi==5.2.0",
         "eth-account==0.13.7",
         "hexbytes==1.3.1",
-        "PyJWT==2.10.1",
-        "requests==2.32.5",
-        "web3==7.14.0",
+        "jcs==0.2.1",
         "pytest==9.0.2",
         "pytest-mock==3.15.1",
-        "python-dotenv==1.2.1"
+        "PyJWT==2.10.1",
+        "python-dotenv==1.2.1",
+        "requests==2.32.5",
+        "web3==7.14.0",
     ]
 )

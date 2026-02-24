@@ -1,24 +1,37 @@
 import ast
+import jcs
+import json
 import time
 
+from dataclasses import asdict
 from hexbytes import HexBytes
-from requests import Session
-from typing import Optional
-from web3.providers import HTTPProvider
+from typing import Any, Optional
 
-from .models import (
-    BlockchainError,
-)
+from .models import BlockchainError, EventData
+from .connection import Connection
 
 
-def to_0xhex(value):
-    if isinstance(value, HexBytes):
+def bytes_to_0xhex(value):
+    if isinstance(value, dict):
+        return {bytes_to_0xhex(k): bytes_to_0xhex(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        converted = [bytes_to_0xhex(v) for v in value]
+        return type(value)(converted)
+    if isinstance(value, (HexBytes, bytes)):
         return '0x' + value.hex()
-    if isinstance(value, bytes):
-        return '0x' + value.hex()
-    if isinstance(value, str) and not value.startswith('0x'):
-        return '0x' + value
     return value
+
+
+def hex0x_to_bytes(value):
+    if isinstance(value, dict):
+        return {hex0x_to_bytes(k): hex0x_to_bytes(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        converted = [hex0x_to_bytes(v) for v in value]
+        return type(value)(converted)
+    if isinstance(value, str) and value.startswith('0x'):
+        return bytes.fromhex(value[2:])
+    return value
+
 
 
 def parse_error(error: Exception) -> BlockchainError:
@@ -39,15 +52,13 @@ def parse_error(error: Exception) -> BlockchainError:
         return BlockchainError(message=str(error), status=0)
 
 
-def wait_for_liveness(provider: HTTPProvider, timeout: int = 30, poll_interval: float = 1.0) -> None:
-    node_url = provider.endpoint_uri
-
-    session: Optional[Session] = getattr(provider, 'session', None) or getattr(provider, '_request_session', None)
-    if session is None:
-        session = Session()
-    
-    request_kwargs = getattr(provider, 'request_kwargs', {}) or {}
-    request_timeout = request_kwargs.get('timeout')
+def wait_for_liveness(
+        connection: Connection,
+        timeout: int = 30,
+        poll_interval: float = 1.0
+        ) -> None:
+    node_url = connection.node_url
+    session = connection.session
 
     liveness_url = f"{node_url.rstrip('/')}/liveness"
     deadline = time.monotonic() + timeout
@@ -55,28 +66,34 @@ def wait_for_liveness(provider: HTTPProvider, timeout: int = 30, poll_interval: 
 
     while time.monotonic() < deadline:
         try:
-            get_kwargs = {}
-            if request_timeout is not None:
-                get_kwargs['timeout'] = request_timeout
-
-            resp = session.get(liveness_url, **get_kwargs)
+            resp = session.get(liveness_url)
             if 200 <= resp.status_code < 300:
                 return
         except Exception as e:
             last_error = e
-        
         time.sleep(poll_interval)
-    
+
     raise ConnectionError(
-        f"Node at {node_url} not live after {timeout}s (GET {liveness_url}): : {last_error}"
+        f"Node at {node_url} not live after {timeout}s. "
+        f"GET {liveness_url}: {last_error}"
     )
 
-# def parse_event_data(resp) -> EventData:
-#     return EventData(
-#         address=str(resp.address),
-#         block_hash=to_0xhex(resp.blockHash),
-#         block_number=str(resp.blockNumber),
-#         event_name=resp.event,
-#         event_args=dict(resp.args),
-#         transaction_hash=to_0xhex(resp.transactionHash) 
-#     )
+def parse_event_data(log) -> EventData:
+    return EventData(
+        address=str(log.address),
+        block_hash=bytes_to_0xhex(log.blockHash),
+        block_number=str(log.blockNumber),
+        event_name=log.event,
+        event_args={
+            k: bytes_to_0xhex(v) if isinstance(v, (bytes, HexBytes)) else v
+            for k, v in dict(log.args).items()
+        },
+        transaction_hash=bytes_to_0xhex(log.transactionHash),
+        log_index=str(log.logIndex)
+    )
+
+def canonicalize_json(json_data: Any) -> str:
+    return jcs.canonicalize(json_data).decode('utf-8')
+
+def pretty(obj) -> str:
+    return json.dumps(asdict(obj), indent=2)

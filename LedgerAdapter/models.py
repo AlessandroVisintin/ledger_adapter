@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Dict
 
 
 @dataclass
@@ -44,5 +44,6 @@ class EventData:
     block_hash: str
     block_number: str
     event_name: str
-    event_args: list
+    event_args: Dict[str, Any]
     transaction_hash: str
+    log_index: str

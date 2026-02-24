@@ -17,8 +17,10 @@ class Connection(ABC):
         self.session = Session()
         self.adapter = HTTPAdapter()
         
-        self.session.verify = False
         self.session.mount('http://', self.adapter)
+        self.session.mount('https://', self.adapter)
+
+        self.session.verify = False
 
     def with_tls(self, ca_cert_path: Optional[str] = None) -> 'Connection':
         if not self.node_url.startswith('https://'):
@@ -26,8 +28,7 @@ class Connection(ABC):
                 f"Cannot enable TLS on non-https url '{self.node_url}'")
         
         self.ca_cert_path = ca_cert_path
-        self.session.verify = ca_cert_path or True
-        self.session.mount('https://', self.adapter)
+        self.session.verify = ca_cert_path if ca_cert_path is not None else True
         
         return self
 
